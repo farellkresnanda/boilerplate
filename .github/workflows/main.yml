@@ -1,6 +1,10 @@
-name: Tests
+name: Tests and Deploy
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
 
 jobs:
   test:
@@ -53,3 +57,23 @@ jobs:
 
       - name: Execute tests
         run: vendor/bin/phpunit
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_PRIVATE_KEY }}
+          script: |
+            cd /var/www/laravel-app
+            git pull origin main
+            composer install --no-interaction --prefer-dist --optimize-autoloader
+            php artisan migrate --force
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
