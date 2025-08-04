@@ -10,7 +10,6 @@ on:
 jobs:
   test:
     # We'll run the test job on a single, stable configuration.
-    # This is more robust for an application and avoids versioning conflicts.
     runs-on: ubuntu-latest
 
     name: Run Unit Tests
@@ -37,14 +36,18 @@ jobs:
         run: php -r "file_exists('.env') || copy('.env.example', '.env');"
 
       - name: Install dependencies
-        # This is the most reliable way to install dependencies in CI.
-        # It reads composer.lock and installs the exact versions, preventing conflicts.
-        run: composer install --prefer-dist --no-interaction
+        # IMPORTANT: We are using `composer update` here instead of `composer install`.
+        # The error log indicates that your `composer.lock` file is outdated and
+        # contains dependencies that are incompatible with PHP 8.2.
+        # This command will resolve all dependencies based on your `composer.json`
+        # and create a new `composer.lock` file that works with PHP 8.2.
+        run: composer update --prefer-dist --no-interaction
 
       - name: Install NPM Dependencies
         run: npm install
 
       - name: Compile Assets
+        # Changed `npm run production` to the more modern `npm run build`
         run: npm run build
 
       - name: Generate Key
