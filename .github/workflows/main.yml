@@ -1,3 +1,4 @@
+# Tests and Deploy
 name: Tests and Deploy
 
 on:
@@ -8,19 +9,11 @@ on:
 
 jobs:
   test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: true
-      matrix:
-        os: [ubuntu-latest]
-        php: [7.4]
-        laravel: [8.*]
-        stability: [prefer-stable]
-        include:
-          - laravel: 8.*
-            testbench: 6.*
+    # We'll run the test job on a single, stable configuration.
+    # This is more robust for an application and avoids versioning conflicts.
+    runs-on: ubuntu-latest
 
-    name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
+    name: Run Unit Tests
 
     steps:
       - name: Checkout code
@@ -29,7 +22,9 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          # Use a modern, stable PHP version.
+          # The exact version should match what you use in your project.
+          php-version: 8.2
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo
           coverage: none
 
@@ -38,19 +33,19 @@ jobs:
           echo "::add-matcher::${{ runner.tool_cache }}/php.json"
           echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
 
-      - name: Copy ENV Laravel Configuration for CI
+      - name: Copy .env file for CI
         run: php -r "file_exists('.env') || copy('.env.example', '.env');"
 
       - name: Install dependencies
-        run: |
-          composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
-          composer update --${{ matrix.stability }} --prefer-dist --no-interaction
+        # This is the most reliable way to install dependencies in CI.
+        # It reads composer.lock and installs the exact versions, preventing conflicts.
+        run: composer install --prefer-dist --no-interaction
 
       - name: Install NPM Dependencies
         run: npm install
 
       - name: Compile Assets
-        run: npm run production
+        run: npm run build
 
       - name: Generate Key
         run: php artisan key:generate
