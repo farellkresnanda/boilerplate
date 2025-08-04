@@ -41,13 +41,17 @@ jobs:
           coverage: none
 
       - name: Install Composer Dependencies
-        run: composer install --prefer-dist --no-progress --no-suggest
+        run: composer install --prefer-dist --no-progress
 
-      - name: Copy .env.example to .env
-        run: cp .env.example .env
+      - name: Copy .env.example to .env and .env.testing
+        run: |
+          cp .env.example .env
+          cp .env.example .env.testing
 
-      - name: Generate Application Key
-        run: php artisan key:generate
+      - name: Generate Application Keys
+        run: |
+          php artisan key:generate
+          php artisan key:generate --env=testing
 
       - name: Install Node.js
         uses: actions/setup-node@v4
@@ -57,7 +61,18 @@ jobs:
       - name: Install NPM Dependencies
         run: npm install
 
-      - name: Run Migrations
+      - name: Wait for MySQL
+        run: | 
+          for i in {1..30}; do
+            if mysqladmin ping -h127.0.0.1 -ularavel -plaravel --silent; then
+              echo "MySQL is up!"
+              break
+            fi
+            echo "Waiting for MySQL..."
+            sleep 2
+          done
+
+      - name: Run Migrations for Testing
         env:
           DB_CONNECTION: mysql
           DB_HOST: 127.0.0.1
@@ -65,7 +80,7 @@ jobs:
           DB_DATABASE: laravel
           DB_USERNAME: laravel
           DB_PASSWORD: laravel
-        run: php artisan migrate --force
+        run: php artisan migrate:fresh --seed --env=testing --force
 
       - name: Run Tests
         env:
@@ -97,7 +112,7 @@ jobs:
           npm install
           npm run build
 
-      - name: Deploy via SSH
+      - name: Deploy via SCP
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -109,8 +124,8 @@ jobs:
       - name: Run Migrations on Server
         uses: appleboy/ssh-action@v0.1.10
         with:
-          host: ${{ secrets.VPS }}
-          username: ${{ secrets.VPS }}
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_PRIVATE_KEY }}
           script: |
             cd /var/www/laravel-app
